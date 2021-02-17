@@ -23,6 +23,7 @@
 #include <xcb/randr.h>
 #include <xcb/render.h>
 #include <xcb/sync.h>
+#include <xcb/xcb.h>
 #include <xcb/xfixes.h>
 #include <xcb/xinerama.h>
 
@@ -126,6 +127,7 @@ static inline void free_xinerama_info(session_t *ps) {
 int64_t get_time_ms(void) {
 	struct timespec tp;
 	clock_gettime(CLOCK_MONOTONIC, &tp);
+	// clock_gettime(CLOCK_BOOTTIME, &tp);
 	return (int64_t)tp.tv_sec * 1000 + (int64_t)tp.tv_nsec / 1000000;
 	//	return (int64_t)tp.tv_sec * 100 + (int64_t)tp.tv_nsec / 250000;
 }
@@ -494,6 +496,11 @@ static struct managed_win *paint_preprocess(session_t *ps, bool *fade_running) {
 	}
 
 	win_stack_foreach_managed(w, &ps->window_stack) {
+
+		//		bool geoChanged =
+		//		    (w->oldX == -5000 && w->oldY == -5000 && w->oldW == 0
+		//&& w->oldH == 0) && 		    (w->isOld == false);
+
 		bool posChanged =
 		    (w->oldX != -10000 && w->oldY != -10000 && w->oldW != 0 && w->oldH != 0) &&
 		    (w->g.x != w->newX || w->g.y != w->newY || w->g.width != w->newW ||
@@ -2444,6 +2451,23 @@ static void session_run(session_t *ps) {
 	ev_run(ps->loop, 0);
 }
 
+// static xcb_atom_t intern_atom(xcb_connection_t *c, const char *name) {
+//	xcb_atom_t result = 0;
+//	xcb_intern_atom_reply_t *r =
+//	    xcb_intern_atom_reply(c, xcb_intern_atom(c, 0, strlen(name), name), NULL);
+//	if (r)
+//		result = r->atom;
+//	free(r);
+//	return result;
+//}
+//
+// static uint32_t get_workspace(xcb_connection_t *c, xcb_window_t root, xcb_atom_t atom)
+// { 	uint32_t result = 0; 	xcb_get_property_reply_t *reply = xcb_get_property_reply(
+// c,
+// xcb_get_property(c, 0, root, atom, XCB_ATOM_CARDINAL, 0, 42), NULL); 	if (reply
+// && reply->format == 32 && reply->length > 0) 		result = *(uint32_t
+//*)xcb_get_property_value(reply); 	free(reply); 	return result;
+//}
 /**
  * The function that everybody knows.
  */
@@ -2468,6 +2492,34 @@ int main(int argc, char **argv) {
 	if (get_early_config(argc, argv, &config_file, &all_xerrors, &need_fork, &exit_code)) {
 		return exit_code;
 	}
+
+	uint32_t workspace;
+	xcb_generic_event_t *event;
+	xcb_connection_t *c = xcb_connect(NULL, NULL);
+	xcb_screen_t *screen = xcb_setup_roots_iterator(xcb_get_setup(c)).data;
+	xcb_atom_t current_desktop = intern_atom(c, "_NET_CURRENT_DESKTOP");
+
+	xcb_change_window_attributes(c, screen->root, XCB_CW_EVENT_MASK,
+	                             (uint32_t[]){XCB_EVENT_MASK_PROPERTY_CHANGE});
+	workspace = get_workspace(c, screen->root, current_desktop);
+
+	xcb_flush(c);
+
+	printf("At startup, workspace is %d\n", (int)workspace);
+
+	//	while ((event = xcb_wait_for_event(c)) != NULL) {
+	//		if (event->response_type == XCB_PROPERTY_NOTIFY) {
+	//			xcb_property_notify_event_t *notify = (void *)event;
+	//			if (notify->window == screen->root && notify->atom ==
+	//current_desktop) { 				uint32_t new_workspace = 				    get_workspace(c, screen->root,
+	//current_desktop); 				if (new_workspace != workspace) { 					workspace = new_workspace;
+	//					printf("Workspace changed to %d\n",
+	//(int)workspace);
+	//				}
+	//			}
+	//		}
+	//		free(event);
+	//	}
 
 	int pfds[2];
 	if (need_fork) {
@@ -2502,6 +2554,21 @@ int main(int argc, char **argv) {
 	// Main loop
 	bool quit = false;
 	int ret_code = 0;
+
+	/*	while ((event = xcb_wait_for_event(c)) != NULL) {
+	                if (event->response_type == XCB_PROPERTY_NOTIFY) {
+	                        xcb_property_notify_event_t *notify = (void *)event;
+	                        if (notify->window == screen->root && notify->atom ==
+	   current_desktop) { uint32_t new_workspace = get_workspace(c, screen->root,
+	   current_desktop); if (new_workspace != workspace) { workspace = new_workspace;
+	                                        printf("Workspace changed to %d\n",
+	   (int)workspace);
+	                                }
+	                        }
+	                }
+	                free(event);
+	        }
+	        */
 
 	do {
 		Display *dpy = XOpenDisplay(NULL);
@@ -2550,7 +2617,9 @@ int main(int argc, char **argv) {
 		if (dpy) {
 			XCloseDisplay(dpy);
 		}
-	} while (!quit);
+	}
+
+	while (!quit);
 
 	free(config_file);
 

@@ -190,38 +190,53 @@ static void configure_win(session_t *ps, xcb_configure_notify_event_t *ce) {
 	}
 
 	if (!w->managed) {
+		printf("hold up i aint managed yet!!\n\n");
+		//	map_win_start(ps, w);
 		restack_above(ps, w, ce->above_sibling);
 		return;
 	}
 
 	auto mw = (struct managed_win *)w;
-
 	float t = get_time_ms();
-	if (mw->oldX == -10000 && mw->oldY == -10000 && mw->oldW == 0 && mw->oldH == 0) {
-		if (!mw->isOld) {
-			/* mw->isOld = true; */
 
+	//	printf(" before if: oldX/Y value: %d, %d  \n", mw->oldX, mw->oldY);
+	if (mw->oldX == -5000 && mw->oldY == -5000 && mw->oldW == 0 && mw->oldH == 0) {
+		printf("within largest if\n");
+		if (!mw->isOld) {
+			printf("the window is new \n");
+			// mw->isOld = true;
 			if (ps->o.spawn_center_screen) {
 				mw->oldX = ps->root_width / 2;
 				mw->oldY = ps->root_height / 2;
 				mw->oldW = 1;
 				mw->oldH = 1;
 			} else if (ps->o.spawn_center) {
-				mw->oldX = ce->x + ce->width / 2;
-				mw->oldY = ce->y + ce->height / 2;
+				log_warn(" \n inside spawn_center \n");
+				printf("oldX/Y value: %d, %d  \n", mw->oldX, mw->oldY);
+				// mw->oldX = ce->x + ce->width / 2;
+				mw->oldX = ce->x + ce->width / 5;
+				mw->oldY = ce->y + ce->height / 5;
 				mw->oldW = 1;
 				mw->oldH = 1;
+				printf("ce->x and ce-width: %d, %d  \n", ce->x, ce->width);
+				printf("ce->y and ce-height: %d, %d  \n", ce->y, ce->height);
+				printf("oldX/Y value: %d, %d  \n", mw->oldX, mw->oldY);
+
+				win_update_bounding_shape(ps, mw);
+				//				return;
+
 			} else {
 				mw->oldX = ce->x;
 				mw->oldY = ce->y;
 				mw->oldW = ce->width;
 				mw->oldH = ce->height;
+				//			return;
 			}
-		} else {
+		} else {        // Default behavior. No bools.
 			mw->oldX = ce->x;
 			mw->oldY = ce->y;
-			mw->oldW = ce->width;
-			mw->oldH = ce->height;
+			mw->oldW = 1;
+			mw->oldH = 1;
 		}
 
 		mw->newX = ce->x;
@@ -232,17 +247,24 @@ static void configure_win(session_t *ps, xcb_configure_notify_event_t *ce) {
 		mw->moveTimeY = t;
 		mw->moveTimeW = t;
 		mw->moveTimeH = t;
+
+		printf("newX/Y value: %d, %d  \n", mw->newX, mw->newY);
 	} else {
-		if (mw->newX == mw->g.x && mw->newY == mw->g.y) {
-			mw->oldX = mw->g.x;
-			mw->oldY = mw->g.y;
-			mw->oldW = mw->g.width;
-			mw->oldH = mw->g.height;
-			mw->moveTimeX = t;
-			mw->moveTimeY = t;
-			mw->moveTimeW = t;
-			mw->moveTimeH = t;
-		}
+
+		//	if (mw->newX == mw->g.x && mw->newY == mw->g.y) {
+		//		log_warn("in which case should this occur???"
+		//		         "\n\n");
+		//		mw->oldX = mw->g.x;
+		//		mw->oldY = mw->g.y;
+		//		mw->oldW = mw->g.width;
+		//		mw->oldH = mw->g.height;
+		//		mw->moveTimeX = t * 2;
+		//		mw->moveTimeY = t * 2;
+		//		mw->moveTimeW = t * 2;
+		//		mw->moveTimeH = t * 2;
+		//	}
+
+		/* Handles when windows move to adjust to other windows */
 		if (mw->newX != ce->x || mw->newY != ce->y || mw->newW != ce->width ||
 		    mw->newH != ce->height) {
 			float moveDx = ((float)t - mw->moveTimeX) / ps->o.transition_length;
@@ -312,7 +334,6 @@ static void configure_win(session_t *ps, xcb_configure_notify_event_t *ce) {
 			}
 		}
 	}
-
 	if (mw->state == WSTATE_UNMAPPED || mw->state == WSTATE_UNMAPPING ||
 	    mw->state == WSTATE_DESTROYING) {
 		// Only restack the window to make sure we can handle future restack
@@ -331,8 +352,9 @@ static void configure_win(session_t *ps, xcb_configure_notify_event_t *ce) {
 
 		if (mw->g.width != ce->width || mw->g.height != ce->height ||
 		    mw->g.border_width != ce->border_width) {
-			log_trace("Window size changed, %dx%d -> %dx%d", mw->g.width,
-			          mw->g.height, ce->width, ce->height);
+			//			log_warn("Window size changed, %dx%d ->
+			//%dx%d", mw->g.width, 			         mw->g.height,
+			// ce->width, ce->height);
 			mw->g.width = ce->width;
 			mw->g.height = ce->height;
 			mw->g.border_width = ce->border_width;
@@ -535,8 +557,41 @@ static inline void ev_property_notify(session_t *ps, xcb_property_notify_event_t
 		if (ps->o.use_ewmh_active_win && ps->atoms->a_NET_ACTIVE_WINDOW == ev->atom) {
 			// to update focus
 			ps->pending_updates = true;
+			// when root window changes workspace
+			//		} else if (ps->root == current_desktop) {
+			//			printf('the workspace changed');
 		} else {
-			// Destroy the root "image" if the wallpaper probably changed
+
+			//			if (ev->response_type == XCB_PROPERTY_NOTIFY)
+			//{ 				uint32_t workspace; 				xcb_generic_event_t *event;
+			//				xcb_connection_t *c = xcb_connect(NULL,
+			//NULL); 				xcb_screen_t *screen =
+			//				    xcb_setup_roots_iterator(xcb_get_setup(c)).data;
+			//				xcb_atom_t current_desktop =
+			//				    intern_atom(c,
+			//"_NET_CURRENT_DESKTOP");
+			//
+			//				xcb_change_window_attributes(
+			//				    c, screen->root,
+			//XCB_CW_EVENT_MASK,
+			//				    (uint32_t[]){XCB_EVENT_MASK_PROPERTY_CHANGE});
+			//				workspace = get_workspace(c,
+			//screen->root, current_desktop);
+			//
+			//				printf("%d \n\n", (int)workspace);
+			//				uint32_t new_workspace =
+			//				    get_workspace(c, screen->root,
+			//current_desktop);
+			//
+			//				if (new_workspace != workspace) {
+			//					workspace = new_workspace;
+			//					printf("Workspace changed to
+			//%d\n", (int)workspace);
+			//				}
+			//			}
+
+			// Destroy the root "image" if the wallpaper
+			// probably changed
 			if (x_is_root_back_pixmap_atom(ps, ev->atom)) {
 				root_damaged(ps);
 			}
@@ -567,8 +622,8 @@ static inline void ev_property_notify(session_t *ps, xcb_property_notify_event_t
 		}
 	}
 
-	// If _NET_WM_WINDOW_TYPE changes... God knows why this would happen, but
-	// there are always some stupid applications. (#144)
+	// If _NET_WM_WINDOW_TYPE changes... God knows why this would
+	// happen, but there are always some stupid applications. (#144)
 	if (ev->atom == ps->atoms->a_NET_WM_WINDOW_TYPE) {
 		struct managed_win *w = NULL;
 		if ((w = find_toplevel(ps, ev->window)))
@@ -576,7 +631,8 @@ static inline void ev_property_notify(session_t *ps, xcb_property_notify_event_t
 	}
 
 	if (ev->atom == ps->atoms->a_NET_WM_BYPASS_COMPOSITOR) {
-		// Unnecessay until we remove the queue_redraw in ev_handle
+		// Unnecessay until we remove the queue_redraw in
+		// ev_handle
 		queue_redraw(ps);
 	}
 
@@ -585,7 +641,8 @@ static inline void ev_property_notify(session_t *ps, xcb_property_notify_event_t
 		auto w = find_managed_win(ps, ev->window) ?: find_toplevel(ps, ev->window);
 		if (w) {
 			win_update_opacity_prop(ps, w);
-			// we cannot receive OPACITY change when window is destroyed
+			// we cannot receive OPACITY change when window is
+			// destroyed
 			assert(w->state != WSTATE_DESTROYING);
 			w->opacity_target = win_calc_opacity_target(ps, w, false);
 			if (w->state == WSTATE_MAPPED) {
@@ -603,7 +660,8 @@ static inline void ev_property_notify(session_t *ps, xcb_property_notify_event_t
 		auto w = find_toplevel(ps, ev->window);
 		if (w) {
 			win_update_frame_extents(ps, w, ev->window);
-			// If frame extents change, the window needs repaint
+			// If frame extents change, the window needs
+			// repaint
 			add_damage_from_win(ps, w);
 		}
 	}
@@ -749,7 +807,8 @@ static inline void
 ev_selection_clear(session_t *ps, xcb_selection_clear_event_t attr_unused *ev) {
 	// The only selection we own is the _NET_WM_CM_Sn selection.
 	// If we lose that one, we should exit.
-	log_fatal("Another composite manager started and took the _NET_WM_CM_Sn "
+	log_fatal("Another composite manager started and took the "
+	          "_NET_WM_CM_Sn "
 	          "selection.");
 	quit(ps);
 }
@@ -761,17 +820,20 @@ void ev_handle(session_t *ps, xcb_generic_event_t *ev) {
 
 	xcb_window_t wid = ev_window(ps, ev);
 	if (ev->response_type != ps->damage_event + XCB_DAMAGE_NOTIFY) {
-		log_debug("event %10.10s serial %#010x window %#010x \"%s\"",
+		log_debug("event %10.10s serial %#010x window %#010x "
+		          "\"%s\"",
 		          ev_name(ps, ev), ev->full_sequence, wid, ev_window_name(ps, wid));
 	} else {
-		log_trace("event %10.10s serial %#010x window %#010x \"%s\"",
+		log_trace("event %10.10s serial %#010x window %#010x "
+		          "\"%s\"",
 		          ev_name(ps, ev), ev->full_sequence, wid, ev_window_name(ps, wid));
 	}
 
-	// Check if a custom XEvent constructor was registered in xlib for this event
-	// type, and call it discarding the constructed XEvent if any. XESetWireToEvent
-	// might be used by libraries to intercept messages from the X server e.g. the
-	// OpenGL lib waiting for DRI2 events.
+	// Check if a custom XEvent constructor was registered in xlib for
+	// this event type, and call it discarding the constructed XEvent
+	// if any. XESetWireToEvent might be used by libraries to
+	// intercept messages from the X server e.g. the OpenGL lib
+	// waiting for DRI2 events.
 
 	// XXX This exists to workaround compton issue #33, #34, #47
 	// For even more details, see:
@@ -783,9 +845,10 @@ void ev_handle(session_t *ps, xcb_generic_event_t *ev) {
 		XEvent dummy;
 
 		// Stop Xlib from complaining about lost sequence numbers.
-		// proc might also just be Xlib internal event processing functions, and
-		// because they probably won't see all X replies, they will complain about
-		// missing sequence numbers.
+		// proc might also just be Xlib internal event processing
+		// functions, and because they probably won't see all X
+		// replies, they will complain about missing sequence
+		// numbers.
 		//
 		// We only need the low 16 bits
 		ev->sequence = (uint16_t)(LastKnownRequestProcessed(ps->dpy) & 0xffff);

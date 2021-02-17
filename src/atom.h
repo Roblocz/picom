@@ -3,8 +3,8 @@
 
 #include <xcb/xcb.h>
 
-#include "meta.h"
 #include "cache.h"
+#include "meta.h"
 
 // clang-format off
 // Splitted into 2 lists because of the limitation of our macros
@@ -38,7 +38,8 @@
 	_NET_WM_WINDOW_TYPE_DND, \
 	_NET_WM_STATE, \
 	_NET_WM_STATE_FULLSCREEN, \
-	_NET_WM_BYPASS_COMPOSITOR
+	_NET_WM_BYPASS_COMPOSITOR, \
+	_NET_CURRENT_DESKTOP
 // clang-format on
 
 #define ATOM_DEF(x) xcb_atom_t a##x

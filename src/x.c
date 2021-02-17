@@ -339,9 +339,10 @@ void x_clear_picture_clip_region(xcb_connection_t *c, xcb_render_picture_t pict)
 	return;
 }
 
-enum { XSyncBadCounter = 0,
-       XSyncBadAlarm = 1,
-       XSyncBadFence = 2,
+enum {
+	XSyncBadCounter = 0,
+	XSyncBadAlarm = 1,
+	XSyncBadFence = 2,
 };
 
 /**

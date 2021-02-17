@@ -153,3 +153,23 @@ static inline void dump_drawable(session_t *ps, xcb_drawable_t drawable) {
 	          drawable, r->x, r->y, r->width, r->height, r->border_width, r->depth);
 	free(r);
 }
+
+static xcb_atom_t intern_atom(xcb_connection_t *c, const char *name) {
+	xcb_atom_t result = 0;
+	xcb_intern_atom_reply_t *r =
+	    xcb_intern_atom_reply(c, xcb_intern_atom(c, 0, strlen(name), name), NULL);
+	if (r)
+		result = r->atom;
+	free(r);
+	return result;
+}
+
+static uint32_t get_workspace(xcb_connection_t *c, xcb_window_t root, xcb_atom_t atom) {
+	uint32_t result = 0;
+	xcb_get_property_reply_t *reply = xcb_get_property_reply(
+	    c, xcb_get_property(c, 0, root, atom, XCB_ATOM_CARDINAL, 0, 42), NULL);
+	if (reply && reply->format == 32 && reply->length > 0)
+		result = *(uint32_t *)xcb_get_property_value(reply);
+	free(reply);
+	return result;
+}
